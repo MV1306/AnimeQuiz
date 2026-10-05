@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: 'http://localhost:5199/api' });
+// const api = axios.create({ baseURL: 'http://localhost:5199/api' });
+const api = axios.create({ baseURL: 'https://animequizapi-d7gvh5aqe9bacqgb.westus3-01.azurewebsites.net/api' });
 
 export interface ParticipantResponse {
   id: number;
