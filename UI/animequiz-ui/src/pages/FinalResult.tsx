@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import html2canvas from 'html2canvas';
 import { quizApi, type QuizResultResponse } from '../api/quizApi';
 import { useSound } from '../hooks/useSound';
+import ShareCard from '../components/ShareCard';
 
 function getRank(score: number): { title: string; emoji: string; color: string } {
   if (score >= 90) return { title: 'Hashira', emoji: '⚔️', color: '#d4af37' };
@@ -20,6 +22,8 @@ export default function FinalResult() {
 
   const [result, setResult] = useState<QuizResultResponse | null>(location.state?.result ?? null);
   const [loading, setLoading] = useState(!result);
+  const [sharing, setSharing] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (result) return;
@@ -36,6 +40,42 @@ export default function FinalResult() {
     const pct = Number(result.score);
     if (pct >= 60) playCorrect(); else playWrong();
   }, [result, playCorrect, playWrong]);
+
+  const handleShare = async () => {
+    if (!shareCardRef.current || !result) return;
+    setSharing(true);
+    try {
+      const canvas = await html2canvas(shareCardRef.current, {
+        backgroundColor: '#12121a',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], 'animequiz-result.png', { type: 'image/png' });
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            title: 'AnimeQuiz Result',
+            text: `I scored ${Number(result.score).toFixed(0)}% on the Demon Slayer Quiz! Can you beat me? 🗡️`,
+            files: [file],
+          });
+        } else {
+          // Desktop fallback: download the image
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'animequiz-result.png';
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/png');
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') console.error(e);
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const handlePlayAgain = async () => {
     if (!result) return;
@@ -140,6 +180,9 @@ export default function FinalResult() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+            <button className="btn btn-gold" style={{ width: '100%' }} onClick={handleShare} disabled={sharing}>
+              {sharing ? 'Generating...' : '📤 Share Result'}
+            </button>
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={handlePlayAgain}>
               🔄 Play Again
             </button>
@@ -149,6 +192,18 @@ export default function FinalResult() {
           </div>
         </div>
       </div>
+
+      {/* Off-screen share card for html2canvas */}
+      <ShareCard
+        ref={shareCardRef}
+        name={result.participantName}
+        score={pct}
+        correct={result.correctAnswers}
+        total={result.totalQuestions}
+        rankTitle={rank.title}
+        rankEmoji={rank.emoji}
+        rankColor={rank.color}
+      />
     </div>
   );
 }
