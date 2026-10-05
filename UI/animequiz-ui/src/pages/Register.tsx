@@ -33,6 +33,8 @@ export default function Register() {
       const participant = await quizApi.createParticipant(form);
       localStorage.setItem('participantId', String(participant.id));
       localStorage.setItem('participantName', participant.name);
+      localStorage.setItem('participantMobile', form.mobile);
+      localStorage.setItem('participantEmail', form.email);
       navigate(`/quiz/${participant.id}`);
     } catch {
       setApiError('Failed to start quiz. Please try again.');

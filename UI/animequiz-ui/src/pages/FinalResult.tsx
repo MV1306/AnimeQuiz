@@ -20,7 +20,6 @@ export default function FinalResult() {
 
   const [result, setResult] = useState<QuizResultResponse | null>(location.state?.result ?? null);
   const [loading, setLoading] = useState(!result);
-  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (result) return;
@@ -40,14 +39,11 @@ export default function FinalResult() {
 
   const handlePlayAgain = async () => {
     if (!result) return;
-    setRetrying(true);
-    try {
-      // Re-register with same name — mobile/email reuse requires them stored
-      // Navigate to register page with prefilled name
-      navigate('/register', { state: { prefill: { name: result.participantName } } });
-    } catch {
-      setRetrying(false);
-    }
+    navigate('/register', { state: { prefill: {
+      name: result.participantName,
+      mobile: localStorage.getItem('participantMobile') ?? '',
+      email: localStorage.getItem('participantEmail') ?? '',
+    }}});
   };
 
   if (loading) return (
@@ -144,7 +140,7 @@ export default function FinalResult() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handlePlayAgain} disabled={retrying}>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handlePlayAgain}>
               🔄 Play Again
             </button>
             <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => navigate('/')}>
