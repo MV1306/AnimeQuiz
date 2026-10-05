@@ -12,7 +12,7 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins(builder.Configuration["AllowedOrigins"]?.Split(',') ?? ["http://localhost:5173"])
+        policy.WithOrigins(builder.Configuration["AllowedOrigins"]?.Split(',') ?? ["http://localhost:5173","https://anime-quiz-henna.vercel.app"])
               .AllowAnyHeader()
               .AllowAnyMethod()));
 
