@@ -13,7 +13,8 @@ public record QuestionDto(
     string OptionA,
     string OptionB,
     string OptionC,
-    string OptionD
+    string OptionD,
+    string CorrectAnswer
 );
 
 public record QuizQuestionsResponse(

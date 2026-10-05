@@ -19,6 +19,7 @@ export interface QuestionDto {
   optionB: string;
   optionC: string;
   optionD: string;
+  correctAnswer: string;
 }
 
 export interface QuizQuestionsResponse {

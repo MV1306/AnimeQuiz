@@ -31,7 +31,8 @@ public class QuizController(AppDbContext db) : ControllerBase
             a.Question.OptionA,
             a.Question.OptionB,
             a.Question.OptionC,
-            a.Question.OptionD
+            a.Question.OptionD,
+            a.Question.CorrectAnswer
         )).ToList();
 
         return Ok(new QuizQuestionsResponse(participantId, questions));

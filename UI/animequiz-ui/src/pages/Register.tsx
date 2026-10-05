@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { quizApi } from '../api/quizApi';
 
 interface Errors { name?: string; mobile?: string; email?: string; }
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', mobile: '', email: '' });
+  const location = useLocation();
+  const prefill = location.state?.prefill ?? {};
+  const [form, setForm] = useState({ name: prefill.name ?? '', mobile: prefill.mobile ?? '', email: prefill.email ?? '' });
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');

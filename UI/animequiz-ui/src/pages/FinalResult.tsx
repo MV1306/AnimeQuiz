@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { quizApi, type QuizResultResponse } from '../api/quizApi';
+import { useSound } from '../hooks/useSound';
 
 function getRank(score: number): { title: string; emoji: string; color: string } {
   if (score >= 90) return { title: 'Hashira', emoji: '⚔️', color: '#d4af37' };
@@ -14,8 +15,12 @@ export default function FinalResult() {
   const { participantId } = useParams<{ participantId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { playCorrect, playWrong } = useSound();
+  const soundPlayed = useRef(false);
+
   const [result, setResult] = useState<QuizResultResponse | null>(location.state?.result ?? null);
   const [loading, setLoading] = useState(!result);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (result) return;
@@ -24,6 +29,26 @@ export default function FinalResult() {
       .catch(() => navigate('/'))
       .finally(() => setLoading(false));
   }, [participantId, navigate, result]);
+
+  // Play sound once result is available
+  useEffect(() => {
+    if (!result || soundPlayed.current) return;
+    soundPlayed.current = true;
+    const pct = Number(result.score);
+    if (pct >= 60) playCorrect(); else playWrong();
+  }, [result, playCorrect, playWrong]);
+
+  const handlePlayAgain = async () => {
+    if (!result) return;
+    setRetrying(true);
+    try {
+      // Re-register with same name — mobile/email reuse requires them stored
+      // Navigate to register page with prefilled name
+      navigate('/register', { state: { prefill: { name: result.participantName } } });
+    } catch {
+      setRetrying(false);
+    }
+  };
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -37,76 +62,80 @@ export default function FinalResult() {
   const pct = Number(result.score);
 
   return (
-    <div style={{ minHeight: '100vh', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', padding: '1.5rem 1rem' }}>
       <div className="container" style={{ maxWidth: 560 }}>
         <div className="card" style={{ textAlign: 'center', borderColor: rank.color }}>
-          <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>{rank.emoji}</div>
-          <h1 style={{ color: '#d4af37', fontSize: '1.8rem', marginBottom: '0.25rem' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>{rank.emoji}</div>
+          <h1 style={{ color: '#d4af37', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', marginBottom: '0.25rem' }}>
             Quiz Complete!
           </h1>
-          <p style={{ color: '#9090a0', marginBottom: '1.5rem' }}>
+          <p style={{ color: '#9090a0', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
             Participant: <strong style={{ color: '#e8e0d0' }}>{result.participantName}</strong>
           </p>
 
           {/* Score circle */}
           <div style={{
-            width: 140, height: 140, borderRadius: '50%', margin: '0 auto 1.5rem',
+            width: 130, height: 130, borderRadius: '50%', margin: '0 auto 1.25rem',
             background: `conic-gradient(${rank.color} ${pct * 3.6}deg, #2a2a3a 0deg)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{
-              width: 110, height: 110, borderRadius: '50%', background: '#12121a',
+              width: 102, height: 102, borderRadius: '50%', background: '#12121a',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span style={{ fontSize: '1.8rem', fontWeight: 900, fontFamily: 'Cinzel, serif', color: rank.color }}>
+              <span style={{ fontSize: '1.7rem', fontWeight: 900, fontFamily: 'Cinzel, serif', color: rank.color }}>
                 {pct.toFixed(0)}%
               </span>
             </div>
           </div>
 
-          <div style={{ display: 'inline-block', padding: '0.4rem 1.2rem', borderRadius: 99, background: `${rank.color}22`, color: rank.color, fontFamily: 'Cinzel, serif', fontWeight: 700, marginBottom: '1.5rem' }}>
+          <div style={{ display: 'inline-block', padding: '0.4rem 1.2rem', borderRadius: 99, background: `${rank.color}22`, color: rank.color, fontFamily: 'Cinzel, serif', fontWeight: 700, marginBottom: '1.25rem', fontSize: '0.95rem' }}>
             {rank.title}
           </div>
 
           <hr className="divider" />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#e8e0d0' }}>{result.totalQuestions}</div>
-              <div style={{ fontSize: '0.75rem', color: '#9090a0' }}>Total</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#e8e0d0' }}>{result.totalQuestions}</div>
+              <div style={{ fontSize: '0.72rem', color: '#9090a0' }}>Total</div>
             </div>
             <div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#2ecc71' }}>{result.correctAnswers}</div>
-              <div style={{ fontSize: '0.75rem', color: '#9090a0' }}>Correct</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#2ecc71' }}>{result.correctAnswers}</div>
+              <div style={{ fontSize: '0.72rem', color: '#9090a0' }}>Correct</div>
             </div>
             <div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#e74c3c' }}>{result.wrongAnswers}</div>
-              <div style={{ fontSize: '0.75rem', color: '#9090a0' }}>Wrong</div>
+              <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#e74c3c' }}>{result.wrongAnswers}</div>
+              <div style={{ fontSize: '0.72rem', color: '#9090a0' }}>Wrong</div>
             </div>
           </div>
 
           {/* Answer review */}
           <hr className="divider" />
-          <h3 style={{ color: '#d4af37', marginBottom: '1rem', fontSize: '0.95rem', textAlign: 'left' }}>Answer Review</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem', textAlign: 'left' }}>
+          <h3 style={{ color: '#d4af37', marginBottom: '0.85rem', fontSize: '0.9rem', textAlign: 'left' }}>Answer Review</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '1.5rem', textAlign: 'left' }}>
             {result.answerResults.map((a, i) => (
-              <div key={a.questionId} style={{ padding: '0.75rem', borderRadius: 8, border: `1px solid ${a.isCorrect ? '#2ecc71' : '#e74c3c'}22`, background: a.isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(231,76,60,0.05)' }}>
+              <div key={a.questionId} style={{
+                padding: '0.7rem 0.85rem', borderRadius: 8,
+                border: `1px solid ${a.isCorrect ? '#2ecc71' : '#e74c3c'}22`,
+                background: a.isCorrect ? 'rgba(46,204,113,0.05)' : 'rgba(231,76,60,0.05)',
+              }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                  <span style={{ flexShrink: 0 }}>{a.isCorrect ? '✅' : '❌'}</span>
-                  <div>
-                    <p style={{ fontSize: '0.85rem', color: '#e8e0d0', marginBottom: '0.3rem' }}>
+                  <span style={{ flexShrink: 0, fontSize: '0.9rem' }}>{a.isCorrect ? '✅' : '❌'}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: '0.83rem', color: '#e8e0d0', marginBottom: '0.25rem' }}>
                       <strong>Q{i + 1}.</strong> {a.questionText}
                     </p>
                     {!a.isCorrect && (
-                      <p style={{ fontSize: '0.78rem', color: '#e74c3c' }}>
+                      <p style={{ fontSize: '0.76rem', color: '#e74c3c' }}>
                         Your answer: <strong>{a.selectedAnswer || 'Not answered'}</strong>
                       </p>
                     )}
-                    <p style={{ fontSize: '0.78rem', color: '#2ecc71' }}>
+                    <p style={{ fontSize: '0.76rem', color: '#2ecc71' }}>
                       Correct: <strong>{a.correctAnswer}</strong>
                     </p>
                     {a.explanation && (
-                      <p style={{ fontSize: '0.75rem', color: '#9090a0', marginTop: '0.2rem' }}>{a.explanation}</p>
+                      <p style={{ fontSize: '0.73rem', color: '#9090a0', marginTop: '0.2rem' }}>{a.explanation}</p>
                     )}
                   </div>
                 </div>
@@ -114,9 +143,14 @@ export default function FinalResult() {
             ))}
           </div>
 
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('/')}>
-            ⚔️ Play Again
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handlePlayAgain} disabled={retrying}>
+              🔄 Play Again
+            </button>
+            <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => navigate('/')}>
+              🏠 Home
+            </button>
+          </div>
         </div>
       </div>
     </div>

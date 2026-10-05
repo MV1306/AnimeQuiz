@@ -132,6 +132,24 @@ h1, h2, h3 { font-family: 'Cinzel', serif; }
 
 /* Responsive */
 @media (max-width: 600px) {
-  .card { padding: 1.25rem; }
-  .btn { padding: 0.65rem 1.25rem; font-size: 0.85rem; }
+  .card { padding: 1rem; }
+  .btn { padding: 0.7rem 1.1rem; font-size: 0.85rem; }
+  .option-btn { padding: 0.85rem 1rem; font-size: 0.9rem; }
+  .timer { font-size: 1.2rem; }
+  .container { padding: 0 0.75rem; }
+  h1 { font-size: 1.5rem; }
+}
+
+/* Safe area for notched phones */
+@supports (padding: max(0px)) {
+  body { padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+}
+
+/* Prevent tap highlight on mobile */
+button { -webkit-tap-highlight-color: transparent; }
+
+/* Touch-friendly min height for interactive elements */
+@media (hover: none) {
+  .option-btn { min-height: 52px; }
+  .btn { min-height: 48px; }
 }

@@ -1,23 +1,29 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { quizApi, type QuestionDto, type QuizQuestionsResponse } from '../api/quizApi';
 import Timer from '../components/Timer';
+import { useSound } from '../hooks/useSound';
 
 const ROUND_SECONDS = 90;
 const OPTIONS = ['A', 'B', 'C', 'D'] as const;
+const ADVANCE_DELAY = 1400;
 
 export default function Quiz() {
   const { participantId } = useParams<{ participantId: string }>();
   const navigate = useNavigate();
   const pid = Number(participantId);
+  const { playCorrect, playWrong, playTick } = useSound();
 
   const [data, setData] = useState<QuizQuestionsResponse | null>(null);
+  const [currentQ, setCurrentQ] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [timerRunning, setTimerRunning] = useState(false);
-  const [currentQ, setCurrentQ] = useState(0);
+  const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     quizApi.getQuestions(pid)
@@ -26,14 +32,14 @@ export default function Quiz() {
       .finally(() => setLoading(false));
   }, [pid]);
 
-  const handleSubmit = useCallback(async () => {
+  const doSubmit = useCallback(async (finalAnswers: Record<number, string>) => {
     if (!data) return;
     setTimerRunning(false);
     setSubmitting(true);
     try {
       const answerList = data.questions.map(q => ({
         questionId: q.id,
-        selectedAnswer: answers[q.id] ?? '',
+        selectedAnswer: finalAnswers[q.id] ?? '',
       }));
       const result = await quizApi.submitQuiz(pid, answerList);
       navigate(`/result/${pid}`, { state: { result } });
@@ -41,7 +47,43 @@ export default function Quiz() {
       setError('Failed to submit. Please try again.');
       setSubmitting(false);
     }
-  }, [data, answers, pid, navigate]);
+  }, [data, pid, navigate]);
+
+  const handleSelect = useCallback((opt: string, q: QuestionDto) => {
+    if (locked || submitting) return;
+    setSelected(opt);
+    setLocked(true);
+
+    const isCorrect = opt === q.correctAnswer;
+    if (isCorrect) playCorrect(); else playWrong();
+
+    const newAnswers = { ...answers, [q.id]: opt };
+    setAnswers(newAnswers);
+
+    const isLast = currentQ === (data?.questions.length ?? 1) - 1;
+    advanceRef.current = setTimeout(() => {
+      if (isLast) {
+        doSubmit(newAnswers);
+      } else {
+        setCurrentQ(i => i + 1);
+        setSelected(null);
+        setLocked(false);
+      }
+    }, ADVANCE_DELAY);
+  }, [locked, submitting, answers, currentQ, data, playCorrect, playWrong, doSubmit]);
+
+  const handleExpire = useCallback(() => {
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+    doSubmit(answers);
+  }, [answers, doSubmit]);
+
+  const handleTick = useCallback((remaining: number) => {
+    if (remaining <= 10) playTick();
+  }, [playTick]);
+
+  useEffect(() => () => {
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+  }, []);
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -67,101 +109,89 @@ export default function Quiz() {
   const totalAnswered = Object.keys(answers).length;
 
   return (
-    <div style={{ minHeight: '100vh', padding: '1.5rem 1rem' }}>
+    <div style={{ minHeight: '100vh', padding: '1.25rem 1rem' }}>
       <div className="container">
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
           <div>
-            <h2 style={{ color: '#d4af37', fontSize: '1.1rem', fontFamily: 'Cinzel, serif' }}>⚔️ Demon Slayer Quiz</h2>
-            <p style={{ color: '#9090a0', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+            <h2 style={{ color: '#d4af37', fontSize: '1rem', fontFamily: 'Cinzel, serif' }}>⚔️ Demon Slayer Quiz</h2>
+            <p style={{ color: '#9090a0', fontSize: '0.78rem', marginTop: '0.15rem' }}>
               {totalAnswered} of {data.questions.length} answered
             </p>
           </div>
-          <Timer seconds={ROUND_SECONDS} onExpire={handleSubmit} running={timerRunning} />
+          <Timer seconds={ROUND_SECONDS} onExpire={handleExpire} onTick={handleTick} running={timerRunning} />
+        </div>
+
+        {/* Progress dots */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', justifyContent: 'center' }}>
+          {data.questions.map((dq, i) => (
+            <div key={dq.id} style={{
+              width: 12, height: 12, borderRadius: '50%',
+              background: answers[dq.id] ? '#d4af37' : i === currentQ ? '#8b0000' : '#2a2a3a',
+              transition: 'background 0.3s',
+              flexShrink: 0,
+            }} />
+          ))}
         </div>
 
         {/* Question card */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <span style={{ color: '#9090a0', fontSize: '0.85rem' }}>
-              Question {currentQ + 1} of {data.questions.length}
+        <div className="card" style={{ marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <span style={{ color: '#9090a0', fontSize: '0.82rem' }}>
+              Question {currentQ + 1} / {data.questions.length}
             </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
               <span className={`badge badge-${q.difficulty.toLowerCase()}`}>{q.difficulty}</span>
               <span className="badge" style={{ background: 'rgba(212,175,55,0.1)', color: '#d4af37' }}>{q.category}</span>
             </div>
           </div>
 
-          <p style={{ fontSize: '1.1rem', lineHeight: 1.6, marginBottom: '1.5rem', color: '#e8e0d0' }}>
+          <p style={{ fontSize: '1.05rem', lineHeight: 1.65, marginBottom: '1.25rem', color: '#e8e0d0' }}>
             {q.questionText}
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {OPTIONS.map(opt => {
               const text = q[`option${opt}` as keyof QuestionDto] as string;
-              const selected = answers[q.id] === opt;
+              const isSelected = selected === opt;
+              const isCorrect = opt === q.correctAnswer;
+
+              let cls = 'option-btn';
+              if (locked) {
+                if (isCorrect) cls += ' correct';
+                else if (isSelected && !isCorrect) cls += ' wrong';
+              } else if (isSelected) {
+                cls += ' selected';
+              }
+
               return (
                 <button
                   key={opt}
-                  className={`option-btn ${selected ? 'selected' : ''}`}
-                  onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))}
+                  className={cls}
+                  onClick={() => handleSelect(opt, q)}
+                  disabled={locked || submitting}
                 >
                   <span className="option-label">{opt}</span>
                   {text}
+                  {locked && isCorrect && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>✅</span>}
+                  {locked && isSelected && !isCorrect && <span style={{ marginLeft: 'auto', flexShrink: 0 }}>❌</span>}
                 </button>
               );
             })}
           </div>
-        </div>
 
-        {/* Navigation */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <button
-            className="btn btn-outline"
-            onClick={() => setCurrentQ(q => Math.max(0, q - 1))}
-            disabled={currentQ === 0}
-          >
-            ← Prev
-          </button>
-
-          {/* Question dots */}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {data.questions.map((q, i) => (
-              <button
-                key={q.id}
-                onClick={() => setCurrentQ(i)}
-                style={{
-                  width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                  background: answers[q.id] ? '#d4af37' : i === currentQ ? '#8b0000' : '#2a2a3a',
-                  color: answers[q.id] || i === currentQ ? '#fff' : '#9090a0',
-                  fontSize: '0.8rem', fontWeight: 700,
-                }}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-
-          {currentQ < data.questions.length - 1 ? (
-            <button className="btn btn-outline" onClick={() => setCurrentQ(q => q + 1)}>
-              Next →
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Submitting...' : '✓ Submit'}
-            </button>
+          {locked && !submitting && (
+            <p style={{ marginTop: '0.85rem', fontSize: '0.8rem', color: '#9090a0', textAlign: 'center' }}>
+              {currentQ < data.questions.length - 1 ? '⏭ Next question in a moment...' : '⚔️ Submitting your result...'}
+            </p>
+          )}
+          {submitting && (
+            <p style={{ marginTop: '0.85rem', fontSize: '0.8rem', color: '#d4af37', textAlign: 'center' }}>
+              ⚔️ Calculating your result...
+            </p>
           )}
         </div>
-
-        {/* Submit button when all answered but not on last question */}
-        {totalAnswered === data.questions.length && currentQ < data.questions.length - 1 && (
-          <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Submitting...' : '✓ Submit Quiz'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
