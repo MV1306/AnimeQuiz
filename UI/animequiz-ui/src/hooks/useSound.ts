@@ -29,22 +29,26 @@ export function useSound() {
   const playCorrect = useCallback(() => {
     const ctx = getOrCreate();
     if (!ctx) return;
-    playTone(ctx, 523, 'sine', 0.15, 0.25);
-    setTimeout(() => playTone(ctx, 659, 'sine', 0.15, 0.25), 120);
-    setTimeout(() => playTone(ctx, 784, 'sine', 0.25, 0.3), 240);
+    ctx.resume().then(() => {
+      playTone(ctx, 523, 'sine', 0.15, 0.25);
+      setTimeout(() => playTone(ctx, 659, 'sine', 0.15, 0.25), 120);
+      setTimeout(() => playTone(ctx, 784, 'sine', 0.25, 0.3), 240);
+    });
   }, [getOrCreate]);
 
   const playWrong = useCallback(() => {
     const ctx = getOrCreate();
     if (!ctx) return;
-    playTone(ctx, 300, 'sawtooth', 0.12, 0.2);
-    setTimeout(() => playTone(ctx, 220, 'sawtooth', 0.2, 0.25), 100);
+    ctx.resume().then(() => {
+      playTone(ctx, 300, 'sawtooth', 0.12, 0.2);
+      setTimeout(() => playTone(ctx, 220, 'sawtooth', 0.2, 0.25), 100);
+    });
   }, [getOrCreate]);
 
   const playTick = useCallback(() => {
     const ctx = getOrCreate();
     if (!ctx) return;
-    playTone(ctx, 880, 'square', 0.05, 0.08);
+    ctx.resume().then(() => playTone(ctx, 880, 'square', 0.05, 0.08));
   }, [getOrCreate]);
 
   return { playCorrect, playWrong, playTick };
