@@ -1,5 +1,6 @@
 using AnimeQuiz.API.Data;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,8 +24,11 @@ using (var scope = app.Services.CreateScope())
     await DbSeeder.SeedAsync(db);
 }
 
-if (app.Environment.IsDevelopment())
+// if (app.Environment.IsDevelopment())
+// {
     app.MapOpenApi();
+    app.MapScalarApiReference();
+// }
 
 app.UseCors();
 app.MapControllers();
